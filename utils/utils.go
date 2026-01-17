@@ -1,0 +1,50 @@
+package utils
+
+import (
+	"fmt"
+	"log"
+	"os"
+)
+
+// CreateFile creates a test_file.txt file
+func CreateFile() (*os.File, error) {
+	file, err := os.Create("test_file.txt")
+	if err != nil {
+		log.Printf("Error while open a dummy file : %v", err)
+
+		return nil, err
+	}
+
+	return file, nil
+}
+
+// AppendData inputs the file, number of lines that needs to be generated and appends those many lines to the file
+func AppendData(file *os.File, numOfLines int) {
+	if file == nil {
+		return
+	}
+
+	for i := 1; i <= numOfLines; i++ {
+		str := fmt.Sprintf("Generated line -> %d\n", i)
+
+		file.WriteString(str)
+	}
+
+	logFileSize(file)
+}
+
+// logFileSize logs the file size
+func logFileSize(file *os.File) {
+	if file == nil {
+		return
+	}
+
+	info, err := os.Stat(file.Name())
+	if err != nil {
+		log.Printf("Error while retrieving info for a file : %v", err)
+
+		return
+	}
+
+	log.Printf("[TRANSFER_AGENT] : File size: %d bytes", info.Size())
+}
