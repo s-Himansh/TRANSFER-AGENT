@@ -14,11 +14,12 @@ func main() {
 
 	defer file.Close()
 
-	// append data into the intiated file
+	// append data into the intiated file - TEST PURPOSE: generating a file of size ~ 5 MB
 	utils.AppendData(file, 120000)
 
-	err = service.TransferFiles("./test_file.txt", "./generated_file/file.txt")
+	err = service.TransferFiles("./source_file/test_file.txt", "./generated_file/file.txt")
 	if err != nil {
 		return
 	}
+
 }
