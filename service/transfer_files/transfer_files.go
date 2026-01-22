@@ -49,10 +49,5 @@ func TransferFiles(sourcePath, destinationPath string) error {
 		}
 	}
 
-	defer func() {
-		srcFile.Close()
-		destFile.Close()
-	}()
-
 	return nil
 }
