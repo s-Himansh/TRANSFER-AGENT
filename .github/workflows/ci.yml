@@ -1,0 +1,40 @@
+name: CI
+
+on:
+    push: 
+        branches: [main]
+    pull_request:
+        branches: [main]
+
+        
+jobs:
+    test:
+        name: Test
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v2
+            
+            - name: Set up Go
+              uses: actions/setup-go@v5
+              with:
+                go-version: '1.25'
+                cache: 'true'
+                
+            - name: Download Dependencies
+              run: go mod download
+              
+            - name: Verify downloaded dependencies
+              run: go mod verify  
+            
+            - name: Run tests
+              run: go test -v -race -coverprofile=coverage.out ./... 
+            
+            - name: Generate coverage report
+              run: go tool cover -html=coverage.out -o coverage.html
+
+            - name: Upload coverage report
+              uses: actions/upload-artifact@v4
+              with:
+                name: coverage-report
+                path: coverage.html  
