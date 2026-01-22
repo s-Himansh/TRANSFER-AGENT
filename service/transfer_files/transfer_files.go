@@ -7,6 +7,8 @@ import (
 )
 
 func TransferFiles(sourcePath, destinationPath string) error {
+	log.Println("[TRANSFER_AGENT] : Starting Transfer...")
+
 	srcFile, err := os.Open(sourcePath)
 	if err != nil {
 		log.Printf("[TRANSFER_AGENT] : Error while opening source file : %v", err)
@@ -48,6 +50,8 @@ func TransferFiles(sourcePath, destinationPath string) error {
 			return err
 		}
 	}
+
+	log.Println("[TRANSFER_AGENT] : Transfer Completed...")
 
 	return nil
 }

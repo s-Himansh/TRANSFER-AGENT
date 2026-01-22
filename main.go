@@ -1,8 +1,6 @@
 package main
 
 import (
-	"log"
-
 	transferFiles "transfer.agent/service/transfer_files"
 	verify "transfer.agent/service/verify_transfer"
 	"transfer.agent/utils"
@@ -30,5 +28,7 @@ func main() {
 		return
 	}
 
-	log.Printf("[TRANSFER_AGENT] : Transfered verified : Status -> %v", transferStatus)
+	if !transferStatus {
+		return
+	}
 }

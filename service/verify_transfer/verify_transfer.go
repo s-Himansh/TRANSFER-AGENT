@@ -1,62 +1,33 @@
 package service
 
 import (
-	"bytes"
-	"io"
 	"log"
-	"os"
-
-	"transfer.agent/models"
-	"transfer.agent/utils"
 )
 
-func generateChecksum(content []byte) *models.Checksum {
-	checkSumHash := utils.CreateSHA256Hash(content)
+func VerifyTransfer(sourcePath, destinationPath string) (transferStatus bool, err error) {
+	log.Println("[TRANSFER_AGENT] : Verifying transfer...")
 
-	return &models.Checksum{Hash: checkSumHash}
-}
-
-func VerifyTransfer(sourcePath, destinationPath string) (string, error) {
-	srcFile, err := os.Open(sourcePath)
+	source, err := calculateChecksum(sourcePath)
 	if err != nil {
-		log.Printf("[TRANSFER_AGENT] : Error while opening source file : %v", err)
+		log.Printf("[TRANSFER_AGENT] : Error while generating checksum for source file : %v", err)
 
-		return "FAILED", err
+		return false, err
 	}
 
-	defer srcFile.Close()
-
-	destFile, err := os.Open(destinationPath)
+	destination, err := calculateChecksum(destinationPath)
 	if err != nil {
-		log.Printf("[TRANSFER_AGENT] : Error while opening destination file : %v", err)
+		log.Printf("[TRANSFER_AGENT] : Error while generating checksum for destination file : %v", err)
 
-		return "FAILED", err
+		return false, err
 	}
 
-	defer destFile.Close()
-
-	sourceFileContent, err := io.ReadAll(srcFile)
-	if err != nil {
-		log.Printf("[TRANSFER_AGENT] : Error while reading source file : %v", err)
-
-		return "FAILED", err
+	if source != destination {
+		return false, nil
 	}
 
-	destinationFileContent, err := io.ReadAll(destFile)
-	if err != nil {
-		log.Printf("[TRANSFER_AGENT] : Error while reading destination file : %v", err)
+	transferStatus = true
 
-		return "FAILED", err
-	}
+	log.Printf("[TRANSFER_AGENT] : Transfer verified : Validation -> %v", transferStatus)
 
-	sourceChecksum := generateChecksum(sourceFileContent)
-	destinationChecksum := generateChecksum(destinationFileContent)
-
-	isSuccess := bytes.Equal(sourceChecksum.Hash, destinationChecksum.Hash)
-
-	if !isSuccess {
-		return "FAILED", nil
-	}
-
-	return "SUCCESS", nil
+	return
 }
