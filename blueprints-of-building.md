@@ -8,5 +8,5 @@ Building a flow that transfers any file in some chunks of data within same syste
 
 ### Run - 2
 
--> Implemented checksum validation post the transfer of source file
+-> Implemented checksum validation post the transfer of source file optimized for all file sizes
 
