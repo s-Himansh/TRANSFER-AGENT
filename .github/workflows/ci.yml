@@ -54,7 +54,7 @@ jobs:
         - name: Run linter on repository
           uses: golangci/golangci-lint-action@v4
           with: 
-            version: v1.60'
+            version: 'v1.60'
             args: --timeout=5m
 
 
