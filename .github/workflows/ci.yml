@@ -80,8 +80,9 @@ jobs:
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
-          name: app-binary
-          path: app    
+          name: transfer-agent-binary
+          path: transfer-agent
+      
 
 
 
