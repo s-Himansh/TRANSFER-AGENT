@@ -27,7 +27,10 @@ func AppendData(file *os.File, numOfLines int) {
 	for i := 1; i <= numOfLines; i++ {
 		str := fmt.Sprintf("Generated line -> %d\n", i)
 
-		file.WriteString(str)
+		_, err := file.WriteString(str)
+		if err != nil {
+			log.Printf("Error while writing data to file : %v", err)
+		}
 	}
 
 	logFileSize(file)
