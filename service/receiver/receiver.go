@@ -17,7 +17,7 @@ type Receiver struct {
 	saveDirectory string
 }
 
-func InitReceiever(port, directory string) *Receiver {
+func Init(port, directory string) *Receiver {
 	return &Receiver{port: port, saveDirectory: directory}
 }
 

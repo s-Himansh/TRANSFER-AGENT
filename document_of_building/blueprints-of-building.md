@@ -16,4 +16,4 @@ Building a flow that transfers any file in some chunks of data within same syste
 
 ### WIP - Run - 4
 
--> Building TCP connection
+-> Receiver creation is done that will receive files over an tcp server rather than a local directory
