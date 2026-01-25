@@ -1,0 +1,23 @@
+Client (Sender)                    Server (Receiver)
+     |                                    |
+     |  1. Server starts listening        |
+     |     on port 8080                   |
+     |                                    | ← net.Listen()
+     |                                    |
+     |  2. Client connects                |
+     | ---------------------------------> | ← listener.Accept()
+     |                                    |
+     |  3. Send metadata (filename, size) |
+     | ---------------------------------> | ← conn.Read()
+     |                                    |
+     |  4. Send file data in chunks       |
+     | ---------------------------------> | ← conn.Read() (loop)
+     | ---------------------------------> |
+     | ---------------------------------> |
+     |                                    |
+     |  5. Receive acknowledgment         |
+     | <--------------------------------- | ← conn.Write()
+     |                                    |
+     |  6. Close connection               |
+     | ---------------------------------> |
+     |                                    |

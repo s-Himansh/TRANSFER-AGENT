@@ -2,19 +2,21 @@ package service
 
 import (
 	"log"
+
+	"transfer.agent/utils"
 )
 
 func VerifyTransfer(sourcePath, destinationPath string) (transferStatus bool, err error) {
 	log.Println("[TRANSFER_AGENT] : Verifying transfer...")
 
-	source, err := calculateChecksum(sourcePath)
+	source, err := utils.CalculateChecksum(sourcePath)
 	if err != nil {
 		log.Printf("[TRANSFER_AGENT] : Error while generating checksum for source file : %v", err)
 
 		return false, err
 	}
 
-	destination, err := calculateChecksum(destinationPath)
+	destination, err := utils.CalculateChecksum(destinationPath)
 	if err != nil {
 		log.Printf("[TRANSFER_AGENT] : Error while generating checksum for destination file : %v", err)
 
