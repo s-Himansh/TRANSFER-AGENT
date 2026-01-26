@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"time"
 
 	"transfer.agent/models"
 	"transfer.agent/service"
@@ -48,7 +49,7 @@ func (s *Sender) Send(path string) error {
 
 	meta := &models.TransferMetaData{FileName: fileMeta.Name(), FileSize: fileMeta.Size(), CheckSum: checkSum}
 
-	request, err := net.Dial("tcp", s.receiverAddr)
+	request, err := net.DialTimeout("tcp", s.receiverAddr, 5*time.Second)
 	if err != nil {
 		log.Printf("[TRANSFER_AGENT | SENDER] : Error while connecting to receiver : %v", err)
 
