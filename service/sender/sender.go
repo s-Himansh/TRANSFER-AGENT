@@ -34,14 +34,14 @@ func (s *Sender) Send(path string) error {
 
 	fileMeta, err := file.Stat()
 	if err != nil {
-		log.Printf("[TRANSFER_AGENT | SENDER] : Error while retreiving source file : %v", err)
+		log.Printf("[TRANSFER_AGENT | SENDER] : Error while retrieving source file : %v", err)
 
 		return err
 	}
 
 	checkSum, err := utils.CalculateChecksum(path)
 	if err != nil {
-		log.Printf("[TRANSFER_AGENT | SENDER] : Error while retreiving checksum for the file : %v", err)
+		log.Printf("[TRANSFER_AGENT | SENDER] : Error while retrieving checksum for the file : %v", err)
 
 		return err
 	}
@@ -55,6 +55,8 @@ func (s *Sender) Send(path string) error {
 		return err
 	}
 
+	defer request.Close()
+
 	metaJson, err := json.Marshal(meta)
 	if err != nil {
 		log.Printf("[TRANSFER_AGENT | SENDER] : Error while marshalling meta data : %v", err)
@@ -64,7 +66,7 @@ func (s *Sender) Send(path string) error {
 
 	request.Write(append(metaJson, '\n'))
 
-	// the receiver is configured to recieve the data in 32KB chunks and we'll be sending the data in same memory constraint
+	// the receiver is configured to receive the data in 32KB chunks and we'll be sending the data in same memory constraint
 	buffer := make([]byte, 32*1024)
 
 	totalBytesSent := int64(0)
