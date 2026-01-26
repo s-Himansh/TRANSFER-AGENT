@@ -5,6 +5,7 @@ import (
 	"log"
 
 	receiver "transfer.agent/service/receiver"
+	sender "transfer.agent/service/sender"
 )
 
 func main() {
@@ -31,16 +32,24 @@ func main() {
 	// 	return
 	// }
 
-	// mode := flag.String("mode", "sender", "Mode: 'sender' or 'receiver'")
+	mode := flag.String("mode", "sender", "Mode: 'sender' or 'receiver'")
 	port := flag.String("port", "6789", "Port for receiver")
-	// server := flag.String("server", "localhost:6780", "Server address for sender")
-	// file := flag.String("file", "./source_file/test_file.txt", "File to send")
+	server := flag.String("server", "localhost:6789", "Server address for sender")
+	file := flag.String("file", "./source_file/test_file.txt", "File to send")
 
 	flag.Parse()
 
-	log.Println("[SOURCE] : Starting in RECEIVER mode")
+	if *mode == "receiver" {
+		log.Println("[SOURCE] : Starting in RECEIVER mode")
 
-	rvc := receiver.Init(*port, "./generated_file")
+		rvc := receiver.Init(*port, "./generated_file")
 
-	rvc.Start()
+		rvc.Start()
+	} else {
+		log.Println("[SOURCE] : Starting in SENDER mode")
+
+		sndr := sender.Init(*server)
+
+		sndr.Send(*file)
+	}
 }
