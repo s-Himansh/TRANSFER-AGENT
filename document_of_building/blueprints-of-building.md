@@ -19,11 +19,12 @@ Building a flow that transfers any file in some chunks of data within same syste
 -> Receiver creation is done that will receive files over an tcp server rather than a local directory
 -> Sender implementation is done that will send files over an tcp server rather than a local directory
 
-### Run - 5
+### WIP - Run - 5
 
 -> TBP
 
-### Run - 6
- 
--> Queueing multiple transfers
+### WIP - Run - 6
+
+-> Queueing multiple transfers and processing them concurrently
 -> Detailed logging on progress of transfers
+-> Interactive CLI
