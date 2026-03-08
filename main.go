@@ -40,7 +40,7 @@ func main() {
 	flag.Parse()
 
 	if *mode == "receiver" {
-		log.Println("[SOURCE] : Starting in RECEIVER mode")
+		log.Println("[DESTINATION] : Starting in RECEIVER mode")
 
 		rvc := receiver.Init(*port, "./generated_file")
 

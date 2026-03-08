@@ -18,3 +18,8 @@ Building a flow that transfers any file in some chunks of data within same syste
 
 -> Receiver creation is done that will receive files over an tcp server rather than a local directory
 -> Sender implementation is done that will send files over an tcp server rather than a local directory
+
+### Run - 5 
+
+-> Queueing multiple transfers 
+-> Detailed logging on progress of transfers
