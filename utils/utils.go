@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"reflect"
 )
 
 // CreateFile creates a test_file.txt file
@@ -75,4 +76,20 @@ func CalculateChecksum(path string) (string, error) {
 
 	// conversion is done to hex for easy comparison of hashes
 	return hex.EncodeToString(hasher.Sum(nil)), nil
+}
+
+// Address returns pointer to any entity passed
+func Address(entity any) any {
+	v := reflect.ValueOf(entity)
+
+	// if entity is already pointer, we don't need to add a nest of pointer pointing to another pointer
+	if v.Kind() == reflect.Pointer {
+		return entity
+	}
+
+	ptr := reflect.New(v.Type())
+
+	ptr.Elem().Set(v)
+
+	return ptr.Interface()
 }
