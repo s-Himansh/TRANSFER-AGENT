@@ -100,7 +100,7 @@ func (a *Agent) SubmitTransfer(source string) (string, error) {
 func (a *Agent) RetrieveJob(id string) (*models.TransferJob, error) {
 	// the resource might be accessed concurrently that's why locks are required
 	a.statusMutex.RLock()
-	defer a.statusMutex.Unlock()
+	defer a.statusMutex.RUnlock()
 
 	job, exists := a.statusStore[id]
 	if !exists {
@@ -113,7 +113,7 @@ func (a *Agent) RetrieveJob(id string) (*models.TransferJob, error) {
 func (a *Agent) ListJobs() []*models.TransferJob {
 	// the resource might be accessed concurrently that's why locks are required
 	a.statusMutex.RLock()
-	defer a.statusMutex.Unlock()
+	defer a.statusMutex.RUnlock()
 
 	jobs := make([]*models.TransferJob, 0, len(a.statusStore))
 
@@ -128,7 +128,7 @@ func (a *Agent) worker(id int) {
 	// mark the job as done post completion
 	defer a.wg.Done()
 
-	log.Printf("[AGENT:%s] : Worker %d started", a.name, id)
+	// log.Printf("[AGENT:%s] : Worker %d started", a.name, id)
 
 	for {
 		select {
@@ -172,14 +172,13 @@ func (a *Agent) processJob(workerID int, job *models.TransferJob) {
 		a.updateJobStatus(job.ID, func(job *models.TransferJob) {
 			job.Status = models.StatusFailed
 			job.Error = err.Error()
-			job.StartedAt = &completionTime
+			job.CompletedAt = &completionTime
 		})
 	} else {
 		log.Printf("[AGENT:%s] : Worker %d completed job %s", a.name, workerID, job.ID)
 
 		a.updateJobStatus(job.ID, func(job *models.TransferJob) {
 			job.Status = models.StatusCompleted
-			job.Error = err.Error()
 			job.StartedAt = &completionTime
 		})
 	}
@@ -188,7 +187,7 @@ func (a *Agent) processJob(workerID int, job *models.TransferJob) {
 
 func (a *Agent) updateJobStatus(jobID string, fn func(*models.TransferJob)) {
 	// the resource might be accessed concurrently that's why locks are required
-	a.statusMutex.RLock()
+	a.statusMutex.Lock()
 	defer a.statusMutex.Unlock()
 
 	// retrieve the job and call the update for that job
