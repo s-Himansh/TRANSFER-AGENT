@@ -15,10 +15,15 @@ import (
 
 type Sender struct {
 	receiverAddr string
+	onProgress   func(sent, total int64)
 }
 
 func Init(addr string) *Sender {
 	return &Sender{receiverAddr: addr}
+}
+
+func (s *Sender) OnProgress(fn func(sent, total int64)) {
+	s.onProgress = fn
 }
 
 type transferResponse struct {
@@ -79,6 +84,9 @@ func (s *Sender) Send(path string) error {
 			totalBytesSent += int64(bytesSent)
 			pct := float64(totalBytesSent) / float64(meta.FileSize) * 100
 			log.Printf("[SENDER] Progress: %.0f%% (%d/%d bytes)", pct, totalBytesSent, meta.FileSize)
+			if s.onProgress != nil {
+				s.onProgress(totalBytesSent, meta.FileSize)
+			}
 		}
 		if readErr != nil {
 			if readErr == io.EOF {
