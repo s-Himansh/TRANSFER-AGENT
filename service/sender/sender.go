@@ -1,4 +1,4 @@
-package service
+package sender
 
 import (
 	"encoding/json"
@@ -7,10 +7,9 @@ import (
 	"log"
 	"net"
 	"os"
-	"strings"
+	"time"
 
 	"transfer.agent/models"
-	"transfer.agent/service"
 	"transfer.agent/utils"
 )
 
@@ -18,104 +17,97 @@ type Sender struct {
 	receiverAddr string
 }
 
-func Init(addr string) service.Sender {
+func Init(addr string) *Sender {
 	return &Sender{receiverAddr: addr}
+}
+
+type transferResponse struct {
+	Status  string `json:"status"`
+	Message string `json:"message"`
 }
 
 func (s *Sender) Send(path string) error {
 	file, err := os.Open(path)
 	if err != nil {
-		log.Printf("[TRANSFER_AGENT | SENDER] : Error while opening source file : %v", err)
-
-		return err
+		return fmt.Errorf("open file: %w", err)
 	}
-
 	defer file.Close()
 
-	fileMeta, err := file.Stat()
+	fileInfo, err := file.Stat()
 	if err != nil {
-		log.Printf("[TRANSFER_AGENT | SENDER] : Error while retrieving source file : %v", err)
-
-		return err
+		return fmt.Errorf("stat file: %w", err)
 	}
 
 	checkSum, err := utils.CalculateChecksum(path)
 	if err != nil {
-		log.Printf("[TRANSFER_AGENT | SENDER] : Error while retrieving checksum for the file : %v", err)
-
-		return err
+		return fmt.Errorf("calculate checksum: %w", err)
 	}
 
-	meta := &models.TransferMetaData{FileName: fileMeta.Name(), FileSize: fileMeta.Size(), CheckSum: checkSum}
+	meta := &models.TransferMetaData{
+		FileName: fileInfo.Name(),
+		FileSize: fileInfo.Size(),
+		CheckSum: checkSum,
+	}
 
-	request, err := net.Dial("tcp", s.receiverAddr)
+	conn, err := net.DialTimeout("tcp", s.receiverAddr, 10*time.Second)
 	if err != nil {
-		log.Printf("[TRANSFER_AGENT | SENDER] : Error while connecting to receiver : %v", err)
-
-		return err
+		return fmt.Errorf("connect to receiver: %w", err)
 	}
+	defer conn.Close()
 
-	defer request.Close()
+	conn.SetDeadline(time.Now().Add(5 * time.Minute))
 
-	metaJson, err := json.Marshal(meta)
+	metaJSON, err := json.Marshal(meta)
 	if err != nil {
-		log.Printf("[TRANSFER_AGENT | SENDER] : Error while marshalling meta data : %v", err)
-
-		return err
+		return fmt.Errorf("marshal metadata: %w", err)
 	}
 
-	request.Write(append(metaJson, '\n'))
+	if _, err := conn.Write(append(metaJSON, '\n')); err != nil {
+		return fmt.Errorf("send metadata: %w", err)
+	}
 
-	// the receiver is configured to receive the data in 32KB chunks and we'll be sending the data in same memory constraint
 	buffer := make([]byte, 32*1024)
-
 	totalBytesSent := int64(0)
 
 	for {
-		bytesRead, err := file.Read(buffer)
-		if err != nil && err != io.EOF {
-			log.Printf("[TRANSFER_AGENT | SENDER] : Error while reading data from file : %v", err)
-
-			return err
+		bytesRead, readErr := file.Read(buffer)
+		if bytesRead > 0 {
+			bytesSent, writeErr := conn.Write(buffer[:bytesRead])
+			if writeErr != nil {
+				return fmt.Errorf("send data: %w", writeErr)
+			}
+			totalBytesSent += int64(bytesSent)
+			pct := float64(totalBytesSent) / float64(meta.FileSize) * 100
+			log.Printf("[SENDER] Progress: %.0f%% (%d/%d bytes)", pct, totalBytesSent, meta.FileSize)
 		}
-
-		// bytesRead is zero states the whole file is already read and possible transfered successfully
-		if bytesRead == 0 {
-			break
-		}
-
-		bytesSent, err := request.Write(buffer[:bytesRead])
-		if err != nil {
-			log.Printf("[TRANSFER_AGENT | SENDER] : Error while sending data from file : %v", err)
-
-			return err
-		}
-
-		totalBytesSent += int64(bytesSent)
-
-		log.Printf("[TRANSFER_AGENT | SENDER] : Progress: %.0f%% (%d/%d bytes)", float64(totalBytesSent)/float64(meta.FileSize)*100, totalBytesSent, meta.FileSize)
-
-		if err == io.EOF {
-			break
+		if readErr != nil {
+			if readErr == io.EOF {
+				break
+			}
+			return fmt.Errorf("read file: %w", readErr)
 		}
 	}
 
-	respBytes := make([]byte, 1024)
-
-	idx, err := request.Read(respBytes)
+	respBytes := make([]byte, 4096)
+	n, err := conn.Read(respBytes)
 	if err != nil {
-		log.Printf("[TRANSFER_AGENT | SENDER] : Error while reading response from receiver : %v", err)
-
-		return err
+		return fmt.Errorf("read response: %w", err)
 	}
 
-	resp := string(respBytes[:idx])
-
-	log.Printf("[TRANSFER_AGENT | SENDER] : Response : %s", resp)
-
-	if strings.Contains(resp, "successfull") {
-		return nil
-	} else {
-		return fmt.Errorf("[TRANSFER_AGENT | SENDER] : Transfer failed : %s", resp)
+	var resp transferResponse
+	if err := json.Unmarshal(respBytes[:n], &resp); err != nil {
+		raw := string(respBytes[:n])
+		if raw != "" {
+			log.Printf("[SENDER] Response: %s", raw)
+		}
+		return fmt.Errorf("parse response: %w", err)
 	}
+
+	log.Printf("[SENDER] Response: %s", resp.Message)
+
+	if resp.Status != "success" {
+		return fmt.Errorf("transfer failed: %s", resp.Message)
+	}
+
+	return nil
 }

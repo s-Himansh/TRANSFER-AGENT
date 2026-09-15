@@ -1,12 +1,17 @@
-package service
+package receiver
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net"
 	"os"
+	"path/filepath"
+	"sync"
+	"time"
 
 	"transfer.agent/models"
 	"transfer.agent/utils"
@@ -15,6 +20,8 @@ import (
 type Receiver struct {
 	port          string
 	saveDirectory string
+	listener      net.Listener
+	wg            sync.WaitGroup
 }
 
 func Init(port, directory string) *Receiver {
@@ -22,141 +29,131 @@ func Init(port, directory string) *Receiver {
 }
 
 func (r *Receiver) Start() error {
-	// intial directory creation should be dynamic
-	err := os.MkdirAll(r.saveDirectory, 0755)
-	if err != nil {
-		log.Printf("[TRANSFER_AGENT | RECEIVER] : Error while creating target directory for storing file %v", err)
-
-		return err
+	if err := os.MkdirAll(r.saveDirectory, 0755); err != nil {
+		return fmt.Errorf("create save directory: %w", err)
 	}
 
-	listener, err := net.Listen("tcp", ":"+r.port)
+	var err error
+	r.listener, err = net.Listen("tcp", ":"+r.port)
 	if err != nil {
-		log.Printf("[TRANSFER_AGENT | RECEIVER] : Error while intialising listener to the client %v", err)
-
-		return err
+		return fmt.Errorf("listen on port %s: %w", r.port, err)
 	}
 
-	defer listener.Close()
+	log.Printf("[RECEIVER] Listening on port %s", r.port)
 
 	for {
-		request, err := listener.Accept()
+		conn, err := r.listener.Accept()
 		if err != nil {
-			log.Printf("[TRANSFER_AGENT | RECEIVER] : Error while accepting connections from client %v", err)
-
-			continue
+			select {
+			case <-context.Background().Done():
+				return nil
+			default:
+				log.Printf("[RECEIVER] Accept error: %v", err)
+				continue
+			}
 		}
-
-		log.Printf("[TRANSFER_AGENT | RECEIVER] : New connection from: %s", request.RemoteAddr())
-
-		go r.handleIncomingRequests(request)
+		log.Printf("[RECEIVER] New connection from: %s", conn.RemoteAddr())
+		r.wg.Add(1)
+		go func() {
+			defer r.wg.Done()
+			r.handleConnection(conn)
+		}()
 	}
 }
 
-func (r *Receiver) handleIncomingRequests(request net.Conn) {
-	defer request.Close() // closing requests is imp. to not end up loosing unecassary memory and crash the server
+func (r *Receiver) Shutdown() {
+	if r.listener != nil {
+		r.listener.Close()
+	}
+	r.wg.Wait()
+}
 
-	reader := bufio.NewReader(request)
+func (r *Receiver) handleConnection(conn net.Conn) {
+	defer conn.Close()
+
+	conn.SetDeadline(time.Now().Add(5 * time.Minute))
+
+	reader := bufio.NewReader(conn)
 
 	metaDataStr, err := reader.ReadString('\n')
 	if err != nil {
-		log.Printf("[TRANSFER_AGENT | RECEIVER] : Error while reading meta data for the request came from client %v", err)
-
-		request.Write([]byte(`[RECEIVER] : Failed to read meta data`))
-
+		log.Printf("[RECEIVER] Error reading metadata: %v", err)
+		conn.Write([]byte(`{"status":"error","message":"failed to read metadata"}`))
 		return
 	}
 
-	parsedMeta := &models.TransferMetaData{}
+	var parsedMeta models.TransferMetaData
+	if err := json.Unmarshal([]byte(metaDataStr), &parsedMeta); err != nil {
+		log.Printf("[RECEIVER] Error parsing metadata: %v", err)
+		conn.Write([]byte(`{"status":"error","message":"invalid metadata"}`))
+		return
+	}
 
-	err = json.Unmarshal([]byte(metaDataStr), &parsedMeta)
+	// Sanitize filename to prevent path traversal
+	cleanName := filepath.Base(parsedMeta.FileName)
+	if cleanName == "." || cleanName == "/" {
+		conn.Write([]byte(`{"status":"error","message":"invalid filename"}`))
+		return
+	}
+
+	log.Printf("[RECEIVER] Receiving: %s (%.2f MB)", cleanName, float64(parsedMeta.FileSize)/(1024*1024))
+
+	filePath := filepath.Join(r.saveDirectory, cleanName)
+	file, err := os.Create(filePath)
 	if err != nil {
-		log.Printf("[TRANSFER_AGENT | RECEIVER] : Error while parsing meta data for the request came from client %v", err)
-
-		request.Write([]byte(`[RECEIVER] : Failed to read meta data`))
-
+		log.Printf("[RECEIVER] Error creating file: %v", err)
+		conn.Write([]byte(`{"status":"error","message":"failed to create file"}`))
 		return
 	}
-
-	log.Printf("[TRANSFER_AGENT | RECEIVER] : Receiving: %s {%.2f MB}", parsedMeta.FileName, float64(parsedMeta.FileSize)/(1024*1024))
-
-	file, err := os.Create(r.saveDirectory + "/" + parsedMeta.FileName)
-	if err != nil {
-		log.Printf("[TRANSFER_AGENT | RECEIVER] : Error while creating file in target path for the request came from client %v", err)
-
-		request.Write([]byte(`[RECEIVER] : Failed to create target file`))
-
-		return
-	}
-
 	defer file.Close()
 
-	// we need to consume the data in same chunks as it is being sent with same memory buffer
-
-	bytesRecieved := int64(0)
-
+	bytesReceived := int64(0)
 	buffer := make([]byte, 32*1024)
 
-	// bytesRecieved keeps track of how many we bytes we need to read and break the flow acc.
-	for bytesRecieved < parsedMeta.FileSize {
-		bytesToRead := int64(len(buffer))
-		remainingBytes := parsedMeta.FileSize - bytesRecieved
-
-		// in case the chunk of data is less than the defined buffer size, update bytesToRead acc.
-		if remainingBytes < bytesToRead {
-			bytesToRead = remainingBytes
+	for bytesReceived < parsedMeta.FileSize {
+		remaining := parsedMeta.FileSize - bytesReceived
+		toRead := int64(len(buffer))
+		if remaining < toRead {
+			toRead = remaining
 		}
 
-		// question may arise, buffer can only consume within it's capacity so why slicing ?
-		// answer to this is if buffer is having less bytes of data possibly when only single chunk is left to consume, the parsing will make sure to only read the left chunk
-		// buffer might block read as it'll not be able to consume data to it's full allocated space
-		bytesRead, err := reader.Read(buffer[:bytesToRead])
-		if err != nil && err != io.EOF {
-			log.Printf("[TRANSFER_AGENT | RECEIVER] : Error while reading source file for the request came from client %v", err)
-
-			request.Write([]byte(`[RECEIVER] : Failed to read sent file`))
-
-			return
-		}
-
+		bytesRead, err := reader.Read(buffer[:toRead])
 		if bytesRead > 0 {
-			_, err = file.Write(buffer[:bytesRead])
-			if err != nil {
-				log.Printf("[TRANSFER_AGENT | RECEIVER] : Error while writing source chunk to target for the request came from client %v", err)
-
-				request.Write([]byte(`[RECEIVER] : Failed to write sent file into target`))
-
+			if _, writeErr := file.Write(buffer[:bytesRead]); writeErr != nil {
+				log.Printf("[RECEIVER] Error writing data: %v", writeErr)
+				conn.Write([]byte(`{"status":"error","message":"write failed"}`))
 				return
 			}
-
-			bytesRecieved += int64(bytesRead)
-
-			log.Printf("[TRANSFER_AGENT | RECEIVER] : Progress: %.0f%% (%d/%d bytes)", float64(bytesRecieved)/float64(parsedMeta.FileSize)*100, bytesRecieved, parsedMeta.FileSize)
+			bytesReceived += int64(bytesRead)
 		}
 
-		if err == io.EOF {
-			break
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			log.Printf("[RECEIVER] Error reading data: %v", err)
+			conn.Write([]byte(`{"status":"error","message":"read failed"}`))
+			return
 		}
 	}
 
-	checkSum, err := utils.CalculateChecksum(r.saveDirectory + "/" + parsedMeta.FileName)
+	file.Close()
+
+	checkSum, err := utils.CalculateChecksum(filePath)
 	if err != nil {
-		log.Printf("[TRANSFER_AGENT | RECEIVER] : Error while calculating checksum for recieved file %v", err)
-
-		request.Write([]byte(`[RECEIVER] : Failed to validate sent file into target`))
-
+		log.Printf("[RECEIVER] Error calculating checksum: %v", err)
+		conn.Write([]byte(`{"status":"error","message":"checksum calculation failed"}`))
 		return
 	}
 
 	if parsedMeta.CheckSum != checkSum {
-		log.Printf("[TRANSFER_AGENT | RECEIVER] : Checksum validation failed due to misatch")
-
-		request.Write([]byte(`[RECEIVER] : Checksum validation failed due to misatch`))
-
+		log.Printf("[RECEIVER] Checksum mismatch: expected %s, got %s", parsedMeta.CheckSum, checkSum)
+		os.Remove(filePath)
+		conn.Write([]byte(`{"status":"error","message":"checksum mismatch"}`))
 		return
 	}
 
-	log.Printf("[TRANSFER_AGENT | RECEIVER] : File transfer and validation successfull")
-
-	request.Write([]byte(`[RECEIVER] : File transfer and validation successfull`))
+	log.Printf("[RECEIVER] Transfer successful: %s", cleanName)
+	fmt.Fprintf(conn, `{"status":"success","message":"file %s transferred successfully"}`, cleanName)
 }
+
