@@ -130,19 +130,24 @@ export default function Dashboard() {
 
   const statusColor = (s: string) => {
     switch (s) {
-      case "completed": return "text-emerald-400";
-      case "sending": case "uploading": case "queued": return "text-blue-400";
-      case "failed": return "text-red-400";
-      default: return "text-slate-400";
+      case "completed": return "text-emerald-600 bg-emerald-50";
+      case "sending": case "uploading": case "queued": return "text-blue-600 bg-blue-50";
+      case "failed": return "text-red-600 bg-red-50";
+      default: return "text-slate-500 bg-slate-100";
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white p-6 md:p-10">
+    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-50/30 to-slate-100 p-6 md:p-10">
       <div className="max-w-6xl mx-auto space-y-8">
         <header>
-          <h1 className="text-3xl font-bold tracking-tight">Transfer Agent</h1>
-          <p className="text-slate-400 mt-1">Upload, share, and transfer files securely</p>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white text-lg">&#128228;</div>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Transfer Agent</h1>
+              <p className="text-slate-500 text-sm">Upload, share, and transfer files securely</p>
+            </div>
+          </div>
         </header>
 
         {/* Upload Zone */}
@@ -151,39 +156,39 @@ export default function Dashboard() {
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
-          className={`border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all ${
-            dragOver ? "border-blue-500 bg-blue-500/10" : "border-slate-700 hover:border-slate-500"
+          className={`border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all bg-white/70 backdrop-blur-sm ${
+            dragOver ? "border-blue-500 bg-blue-50/80 shadow-lg shadow-blue-100" : "border-slate-300 hover:border-blue-400 hover:shadow-md"
           }`}
         >
           <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelect} />
           <div className="text-4xl mb-3">&#128228;</div>
           {uploading ? (
             <div className="space-y-3">
-              <p className="text-slate-300">Uploading...</p>
-              <div className="w-64 mx-auto bg-slate-800 rounded-full h-2">
+              <p className="text-slate-700 font-medium">Uploading...</p>
+              <div className="w-64 mx-auto bg-slate-200 rounded-full h-2.5">
                 <div
-                  className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                  className="bg-blue-500 h-2.5 rounded-full transition-all duration-300"
                   style={{ width: `${progress}%` }}
                 />
               </div>
-              <p className="text-sm text-slate-400">{progress.toFixed(0)}%</p>
+              <p className="text-sm text-slate-500">{progress.toFixed(0)}%</p>
             </div>
           ) : (
             <>
-              <p className="text-slate-300 text-lg">Drop a file here or click to browse</p>
-              <p className="text-slate-500 text-sm mt-1">Any file type, up to 512 MB</p>
+              <p className="text-slate-700 text-lg font-medium">Drop a file here or click to browse</p>
+              <p className="text-slate-400 text-sm mt-1">Any file type, any size</p>
             </>
           )}
         </div>
 
         {/* Send to Peer */}
-        <div className="bg-slate-900/60 backdrop-blur-sm rounded-2xl p-6 border border-slate-800">
-          <h2 className="text-lg font-semibold mb-4">Send to Remote Peer</h2>
+        <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border border-slate-200 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-800 mb-4">Send to Remote Peer</h2>
           <div className="flex flex-col sm:flex-row gap-3">
             <select
               value={peerFile}
               onChange={(e) => setPeerFile(e.target.value)}
-              className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500"
+              className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-700"
             >
               <option value="">Select a file...</option>
               {files.map((f) => (
@@ -194,12 +199,12 @@ export default function Dashboard() {
               value={peerAddr}
               onChange={(e) => setPeerAddr(e.target.value)}
               placeholder="Receiver IP:port (e.g. 192.168.1.5:6789)"
-              className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500"
+              className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-700 placeholder:text-slate-400"
             />
             <button
               onClick={handleSendPeer}
               disabled={!peerFile || !peerAddr || uploading}
-              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 rounded-lg text-sm font-medium transition-colors"
+              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:text-slate-500 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
             >
               Send
             </button>
@@ -208,22 +213,24 @@ export default function Dashboard() {
 
         <div className="grid md:grid-cols-2 gap-8">
           {/* Transfer History */}
-          <div className="bg-slate-900/60 backdrop-blur-sm rounded-2xl p-6 border border-slate-800">
-            <h2 className="text-lg font-semibold mb-4">Transfer History</h2>
+          <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border border-slate-200 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-800 mb-4">Transfer History</h2>
             {transfers.length === 0 ? (
-              <p className="text-slate-500 text-sm">No transfers yet</p>
+              <p className="text-slate-400 text-sm">No transfers yet</p>
             ) : (
               <div className="space-y-3 max-h-96 overflow-y-auto">
                 {transfers.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).map((t) => (
-                  <div key={t.id} className="flex items-center justify-between bg-slate-800/50 rounded-lg p-3">
+                  <div key={t.id} className="flex items-center justify-between bg-slate-50 rounded-xl p-3 border border-slate-100">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{t.file_name}</p>
-                      <p className="text-xs text-slate-400">
+                      <p className="text-sm font-medium text-slate-800 truncate">{t.file_name}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">
                         {formatSize(t.file_size)} &middot; {t.mode} &middot;{" "}
-                        <span className={statusColor(t.status)}>{t.status}</span>
+                        <span className={`inline-block px-1.5 py-0.5 rounded-full text-[10px] font-medium ${statusColor(t.status)}`}>
+                          {t.status}
+                        </span>
                       </p>
                       {t.status === "sending" && (
-                        <div className="w-full bg-slate-700 rounded-full h-1.5 mt-2">
+                        <div className="w-full bg-slate-200 rounded-full h-1.5 mt-2">
                           <div
                             className="bg-blue-500 h-1.5 rounded-full transition-all"
                             style={{ width: `${t.progress}%` }}
@@ -237,14 +244,14 @@ export default function Dashboard() {
                           href={`${API}${t.link}`}
                           target="_blank"
                           rel="noopener"
-                          className="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded-md transition-colors"
+                          className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1 rounded-lg transition-colors font-medium"
                         >
                           Share
                         </a>
                       )}
                       <button
                         onClick={() => handleDelete(t.id)}
-                        className="text-xs bg-slate-700 hover:bg-red-600 px-3 py-1 rounded-md transition-colors"
+                        className="text-xs bg-slate-100 text-slate-500 hover:bg-red-50 hover:text-red-600 px-3 py-1 rounded-lg transition-colors"
                       >
                         Delete
                       </button>
@@ -256,22 +263,22 @@ export default function Dashboard() {
           </div>
 
           {/* Received Files */}
-          <div className="bg-slate-900/60 backdrop-blur-sm rounded-2xl p-6 border border-slate-800">
-            <h2 className="text-lg font-semibold mb-4">Received Files</h2>
+          <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border border-slate-200 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-800 mb-4">Received Files</h2>
             {files.length === 0 ? (
-              <p className="text-slate-500 text-sm">No files received yet</p>
+              <p className="text-slate-400 text-sm">No files received yet</p>
             ) : (
               <div className="space-y-3 max-h-96 overflow-y-auto">
                 {files.map((f) => (
-                  <div key={f.name} className="flex items-center justify-between bg-slate-800/50 rounded-lg p-3">
+                  <div key={f.name} className="flex items-center justify-between bg-slate-50 rounded-xl p-3 border border-slate-100">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{f.name}</p>
-                      <p className="text-xs text-slate-400">{formatSize(f.size)}</p>
+                      <p className="text-sm font-medium text-slate-800 truncate">{f.name}</p>
+                      <p className="text-xs text-slate-500">{formatSize(f.size)}</p>
                     </div>
                     <a
                       href={`${API}/api/files/${f.name}`}
                       download
-                      className="text-xs bg-slate-700 hover:bg-blue-600 px-3 py-1 rounded-md transition-colors ml-3"
+                      className="text-xs bg-emerald-50 text-emerald-600 hover:bg-emerald-100 px-3 py-1 rounded-lg transition-colors font-medium ml-3"
                     >
                       Download
                     </a>
